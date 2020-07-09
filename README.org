@@ -1,0 +1,21 @@
+#+AUTHOR: Panarin Mykhailo
+* lets-mode
+
+  This is a very slim package for configuring and running [[https://github.com/lets-cli/lets][lets]] tasks
+
+** Feature list:
+   - [X] File type recognition
+   - [X] Company completion backend
+   - [ ] TODO: Functions to run the tasks
+** Installing
+   Currently it is only installable through ~load~
+   Clone the package:
+   #+BEGIN_SRC
+   git clone https://github.com/mpanarin/lets-mode.git -b master *where/to/clone*
+   #+END_SRC
+
+   After that load and require the package in your emacs config
+   #+BEGIN_SRC elisp
+   (load "*where/you/cloned*/lets-mode.el")
+   (require 'lets-mode)
+   #+END_SRC
