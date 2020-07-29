@@ -3,10 +3,15 @@
 
   This is a very slim package for configuring and running [[https://github.com/lets-cli/lets][lets]] tasks
 
-** Feature list:
-   - [X] File type recognition
-   - [X] Company completion backend
-   - [ ] TODO: Functions to run the tasks
+** Features list:
+   - File type recognition
+   - Company completion backend
+   - Helm integration to run the tasks
+** TODO list [1/4]
+   - [X] Make a proper parsing of ~lets~ results for command running
+   - [ ] Integrate with projectile
+   - [ ] Running commands is very basic. Integrate with ~magit-popup~ for arguments passing
+   - [ ] Check if possible to make compilation mode properly work with overwriting lines
 ** Installing
    Currently it is only installable through ~load~
    Clone the package:

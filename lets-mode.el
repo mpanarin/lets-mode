@@ -24,13 +24,29 @@
 
 ;; This is a major-mode for editing lets config files
 ;; It provides a completion backend as well as the
-;; machinery (TODO) for running the tasks themselves
+;; machinery for running the tasks themselves
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'yaml-mode)
+(require 's)
+(require 'ansi-color)
+;; completion
 (require 'company)
+;; running
+(require 'compile)
+(require 'helm)
+(require 'magit-popup)
+
+(defgroup lets-mode nil
+  "Lets task runner mode."
+  :group 'tools)
+
+(defcustom lets-command "lets"
+  "Command to run lets."
+  :type 'string
+  :group 'lets-mode)
 
 (defconst top-level-keywords '("shell"
                                "commands"
@@ -47,6 +63,55 @@
                                    "persist_checksum"
                                    "cmd"
                                    "depends"))
+
+(defconst lets-compilation-buffer "*Lets command: %s*")
+
+(defun lets-compilation-filter ()
+  "Filter function for compilation output."
+  (ansi-color-apply-on-region compilation-filter-start (point-max)))
+
+(define-compilation-mode lets-compilation-mode "Lets"
+  "Lets compilation mode."
+  (add-hook 'compilation-filter-hook 'lets-compilation-filter nil t)
+  )
+
+(defun lets-mode--filter-out-lets-result (lines)
+  "filters out the result of lets command to get proper candidates."
+  (let* ((strippedlines (-->
+                (mapcar #'ansi-color-apply lines)
+                (mapcar #'s-trim it)))
+         (start (-elem-index "Available Commands:" strippedlines))
+         (end (-elem-index "Flags:" strippedlines)))
+    (cond
+     ((and start end) (-slice strippedlines (+ start 1) end))
+     (t strippedlines)))
+  )
+
+(defun lets-mode--collect-helm-candidates ()
+  "Collecting candidates for `helm'."
+  (let* ((lets-res (s-lines (shell-command-to-string "lets")))
+         (candidates (lets-mode--filter-out-lets-result lets-res)))
+    (cond
+     ;; Do nothing if this is an error
+     ((string-prefix-p "[ERROR]" (car candidates) t) candidates)
+     ;; parse the results of lets command
+     (t candidates))))
+
+(defun lets-mode--run-task (candidate)
+  (cond
+   ;; Do nothing if this is an error
+   ((string-prefix-p "[ERROR]" candidate t) candidate)
+   ;; run the task in compilation buffer
+   (t
+    (let* ((task (car (s-split-up-to " " (s-trim candidate) 1 t)))
+           (lets-buffer (format lets-compilation-buffer task)))
+      (progn
+        (when (get-buffer lets-buffer)
+          (kill-buffer lets-buffer))
+        (with-current-buffer (get-buffer-create lets-buffer)
+          (compilation-start (s-join " " `(,lets-command ,task)) 'lets-compilation-mode (lambda (_) (buffer-name))))
+        )
+      ))))
 
 (defun lets-mode-current-yaml-level ()
   "Calculate current yaml level"
@@ -65,7 +130,7 @@ Currently it is very naive and calculates indentation level to show proper compl
 (defun lets-mode-company-backend (command &optional arg &rest ignored)
   "`company-mode' completion back-end for Lets."
   (interactive (list 'interactive))
-  (cl-case command
+  (case command
     (interactive (company-begin-backend 'lets-mode-company-backend))
     (prefix (and (eq major-mode 'lets-mode)
                  (company-grab-symbol)))
@@ -77,6 +142,18 @@ Currently it is very naive and calculates indentation level to show proper compl
           (lambda ()
             (add-to-list (make-local-variable 'company-backends)
                          'lets-mode-company-backend)))
+
+;;;###autoload
+(defun lets-mode-run-task ()
+  "Run Lets task."
+  (interactive)
+  (helm
+   :buffer "*Helm Run Lets Task*"
+   :sources (helm-build-sync-source "Lets tasks:"
+              :candidates (lets-mode--collect-helm-candidates)
+              :action '(("Run task" . lets-mode--run-task))
+              ))
+  )
 
 ;;;###autoload
 (define-derived-mode lets-mode yaml-mode "Lets config"
